@@ -232,7 +232,7 @@ const recurFindExtenders = (line: string): string => {
                     const args = extendFrom.split('(')[1].split(')')[0];
                     const name = extendFrom.replace(`(${args})`, '');
                     if (args.length > 0) {
-                        console.log(`${name} : ${args}`);
+                        // DEBUGGING: console.log(`${name} : ${args}`);
                         const argIter = args.split(',');
                         for (let i = 0; i < argIter.length; i++) {
                             for (const v of vars) {

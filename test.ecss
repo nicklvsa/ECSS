@@ -1,13 +1,13 @@
 $some_var: green;
 $hello: 25px;
 
-// use empty <> to allow both ids and classes
+// always use empty <> to declare @struct... probably implement type checking in the future
 @struct<> makeRound ($rad: 15px, $align: left) {
     border-radius: $rad;
     text-align: $align;
 }
 
-@struct<class> test ($color: blue, $msg: hello) {
+@struct<> test ($color: blue, $msg: hello) {
     content: $msg;
     background-color: $color;
 }
