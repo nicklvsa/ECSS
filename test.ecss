@@ -1,0 +1,25 @@
+$some_var: green;
+$hello: 25px;
+
+.some_class { 
+    text-align: center;
+    background-color: $some_var; 
+    @extend<class>: cool_class;
+}
+
+.cool_class {
+    transform: rotate(360deg);
+}
+
+.other {
+    color: white;
+    font-weight: bold;
+}
+
+#example {
+    max-width: 100%;
+}
+
+#some_id {
+    font-size: $hello;
+}
