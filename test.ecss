@@ -1,31 +1,45 @@
 $some_var: green;
 $hello: 25px;
 
+// use empty <> to allow both ids and classes
+@struct<> makeRound ($rad: 15px, $align: left) {
+    border-radius: $rad;
+    text-align: $align;
+}
+
+@struct<class> test ($color: blue, $msg: hello) {
+    content: $msg;
+    background-color: $color;
+}
+
 .some_class { 
     text-align: center;
     background-color: $some_var; 
-    @extend<class>: cool_class;
+    @impl<class>: cool_class;
 }
 
 .cool_class {
     transform: rotate(360deg);
-    @extend<id>: example;
+    @impl<id>: example;
 }
 
 .other {
     color: white;
     font-weight: bold;
+    @impl<id>: some_id;
 }
 
 #example {
     max-width: 100%;
-    @extend<class>: other;
+    @impl<class>: other;
 }
 
 #some_id {
     font-size: $hello;
+    @impl<struct>: test;
 }
 
 .nick {
-   
+    @impl<struct>: test(green, 'world');
+    @impl<struct>: makeRound(22px, center);
 }
