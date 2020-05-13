@@ -9,6 +9,7 @@ $hello: 25px;
 
 .cool_class {
     transform: rotate(360deg);
+    @extend<id>: example;
 }
 
 .other {
@@ -18,8 +19,13 @@ $hello: 25px;
 
 #example {
     max-width: 100%;
+    @extend<class>: other;
 }
 
 #some_id {
     font-size: $hello;
+}
+
+.nick {
+   
 }

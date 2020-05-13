@@ -100,34 +100,41 @@ const parseECSS = async (data: string): Promise<JSSData> => {
             const action = line.split('@')[1].split('<')[0].trim();
             switch (action) {
                 case "extend":
-                    const type = line.split('<')[1].split('>')[0].trim();
-                    const extendFrom = line.split('>')[1].split(':')[1].split(';')[0].trim();
-                    for (const d of defs) {
-                        // console.log(`D_TYPE: ${d.type} TYPE: ${type}  D_NAME: ${d.name} NAME: ${extendFrom}`);
-                        if (d.type == type && d.name == extendFrom) {
-                            line = line.replace(`@extend<${d.type}>: ${d.name};`, d.contents.replace(`${getCSSOperator(d.type)}${d.name} {`, '').replace('}', '').trim()).trim();
-                        } else if (d.name == extendFrom && d.type != type) {
-                            line = `/* did you mean to use type "${getCSSOperator(d.type)}" for @extend selector "${d.name}"? */`;
-                        }
-                    }
+                    line = recurFindExtenders(line);
                     break;
                 default:
                     line = '/* invalid action replaced here */';
                     break;
             }
         }
-
         response.contents += line.trim() + '\n';
     }
 
-    // console.log(defs);
     console.log(response.contents);
     return response;
 };
 
 const getCSSOperator = (type: string) => {
     return (type === 'id' ? '#' : '.');
-}
+};
+
+const recurFindExtenders = (line: string): string => {
+    let newLine: string = '';
+    const type: string = line.split('<')[1].split('>')[0].trim();
+    const extendFrom: string = line.split('>')[1].split(':')[1].split(';')[0].trim();
+    for (const d of defs) {
+        if (d.type == type && d.name == extendFrom) {
+            let defContents = d.contents.replace(`${getCSSOperator(d.type)}${d.name} {`, '').replace('}', '').trim();
+            newLine = line.replace(`@extend<${d.type}>: ${d.name};`, defContents).trim();
+        } else if (d.name == extendFrom && d.type != type) {
+            newLine = `/* did you mean to use type "${getCSSOperator(d.type)}" for @extend selector "${d.name}"? */`;
+        }
+    }
+    if (!newLine.includes('@extend')) {
+        return newLine;
+    }
+    return recurFindExtenders(newLine);
+};
 
 const writeOutput = async (data: JSSData): Promise<void> => {
     const encoder = new TextEncoder();
