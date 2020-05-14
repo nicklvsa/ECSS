@@ -1,7 +1,7 @@
 $some_var: green;
 $hello: 25px;
 
-// always use empty <> to declare @struct... probably implement type checking in the future
+// always use empty <> to declare @struct... probably will implement type checking in the future
 @struct<> makeRound ($rad: 15px, $align: left) {
     border-radius: $rad;
     text-align: $align;

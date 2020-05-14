@@ -6,6 +6,7 @@ export interface JSSData {
 
 export interface JSSVar {
     name: string;
+    origValue: string;
     value: string;
     public: boolean;
     owner: string;

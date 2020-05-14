@@ -1,0 +1,27 @@
+$example: yellow;
+
+// TODO: issue with structs being overridden by calling it more than once
+// TODO: implement struct types to be enforced
+@struct<> test ($color, $msg, $align) {
+    background-color: $color;
+    content: $msg;
+    text-align: $align;
+}
+
+.one {
+    @impl<struct>: test(red, 'something', right);
+
+    // eventually implement type checking in if statements (if statements do NOT working with @impl statements yet)
+    @if<> $example == 'yellow' {
+        background-color: black;
+    }
+}
+
+.two {
+   @impl<struct>: test(green, 'a message', left);
+}
+
+.three {
+    display: flex;
+    text-align: right;
+}

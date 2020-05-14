@@ -28,9 +28,11 @@ const parseECSS = async (data: string): Promise<JSSData> => {
 
         // parse jss variables
         if (line.startsWith('$') && line.replace(/\/\*[\s\S]*?\*\//gm, '').trim().endsWith(';')) {
+            const val = line.split(':')[1].split(';')[0];
             vars.push({
                 name: line.split(':')[0].split('$')[1],
-                value: line.split(':')[1].split(';')[0],
+                value: val,
+                origValue: val,
                 public: true,
                 owner: 'JSS',
                 position: 0,
@@ -56,43 +58,37 @@ const parseECSS = async (data: string): Promise<JSSData> => {
     const firstIter = firstParse.contents.split(/\r\n|\r|\n/g);
     for (let line of firstIter) {
         // parse classes
-        if (line.startsWith('.') && line.replace(/\/\*[\s\S]*?\*\//gm, '').trim().endsWith('{')) {
-            let styleDef = '';
+        if (line.startsWith('.') && !line.startsWith('#') && line.replace(/\/\*[\s\S]*?\*\//gm, '').trim().endsWith('{')) {
             const defName: string = line.split('.')[1].split('{')[0].trim();
 
-            const matcher: RegExp = new RegExp(`.${defName} {[^\0]*?}`, 'gm');
+            const matcher: RegExp = new RegExp(`\\.${defName} {[^\0]*?}`, 'gm');
             if (line.startsWith(`.${defName}`)) {
                 if (matcher.test(firstParse.contents)) {
-                    styleDef += firstParse.contents.match(matcher);
+                    const style: JSSDefinition = {
+                        type: 'class',
+                        name: defName,
+                        contents: firstParse.contents.match(matcher)!.toString() || '',
+                    };
+                    defs.push(style);
                 }
             }
-
-            const style: JSSDefinition = {
-                type: 'class',
-                name: defName,
-                contents: styleDef
-            };
-            defs.push(style);
         }
 
         // parse ids
-        if (line.startsWith('#') && line.replace(/\/\*[\s\S]*?\*\//gm, '').trim().endsWith('{')) {
-            let styleDef = '';
+        if (line.startsWith('#') && !line.startsWith('.') && line.replace(/\/\*[\s\S]*?\*\//gm, '').trim().endsWith('{')) {
             const defName: string = line.split('#')[1].split('{')[0].trim();
 
             const matcher: RegExp = new RegExp(`#${defName} {[^\0]*?}`, 'gm');
             if (line.startsWith(`#${defName}`)) {
                 if (matcher.test(firstParse.contents)) {
-                    styleDef += firstParse.contents.match(matcher);
+                    const style: JSSDefinition = {
+                        type: 'id',
+                        name: defName,
+                        contents: firstParse.contents.match(matcher)!.toString() || '',
+                    };
+                    defs.push(style);
                 }
             }
-
-            const style: JSSDefinition = {
-                type: 'id',
-                name: defName,
-                contents: styleDef
-            };
-            defs.push(style);
         }
 
         secondParse.contents += line.trim() + '\n';
@@ -130,24 +126,53 @@ const parseECSS = async (data: string): Promise<JSSData> => {
                         for (let [i, param] of parseParams.entries()) {
                             param = param.trim();
                             if (param.startsWith('$')) {
-                                if (param.includes(',')) {
-                                    const variable: JSSVar = {
-                                        name: param.split(':')[0].split('$')[1],
-                                        value: param.split(':')[1].split(',')[0],
-                                        public: false,
-                                        owner: structName,
-                                        position: i,
+
+                                if (param.includes(':')) {
+                                    if (param.includes(',')) {
+                                        const val = param.split(':')[1].split(',')[0];
+                                        const variable: JSSVar = {
+                                            name: param.split(':')[0].split('$')[1],
+                                            value: val,
+                                            origValue: val,
+                                            public: false,
+                                            owner: structName,
+                                            position: i,
+                                        }
+                                        vars.push(variable);
+                                    } else {
+                                        const val = param.split(':')[1];
+                                        const variable: JSSVar = {
+                                            name: param.split(':')[0].split('$')[1],
+                                            value: val,
+                                            origValue: val,
+                                            public: false,
+                                            owner: structName,
+                                            position: i,
+                                        }
+                                        vars.push(variable);
                                     }
-                                    vars.push(variable);
                                 } else {
-                                    const variable: JSSVar = {
-                                        name: param.split(':')[0].split('$')[1],
-                                        value: param.split(':')[1],
-                                        public: false,
-                                        owner: structName,
-                                        position: i,
+                                    if (param.includes(',')) {
+                                        const variable: JSSVar = {
+                                            name: param.split('$')[1].split(',')[0],
+                                            value: '',
+                                            origValue: '',
+                                            public: false,
+                                            owner: structName,
+                                            position: i,
+                                        }
+                                        vars.push(variable);
+                                    } else {
+                                        const variable: JSSVar = {
+                                            name: param.split('$')[1],
+                                            value: '',
+                                            origValue: '',
+                                            public: false,
+                                            owner: structName,
+                                            position: i,
+                                        }
+                                        vars.push(variable);
                                     }
-                                    vars.push(variable);
                                 }
                             }
                         }
@@ -161,6 +186,28 @@ const parseECSS = async (data: string): Promise<JSSData> => {
 
                     defs.push(def);
                     break;
+                case "if":
+                    
+                    let compare = line.split('>')[1].split('{')[0].trim();
+                    const ifMatcher: RegExp = new RegExp(`@if<> ${compare.replace('$', '\\$')} {[^\0]*?}`, 'gm');
+
+                    for (const v of vars) {
+                        if (compare.includes(`$${v.name}`)) {
+                            compare = compare.replace(`$${v.name}`, typeof v.value == 'number' ? v.value : `'${v.value.trim()}'`);
+                        }
+                    }
+
+                    if (line.startsWith(`@if`)) {
+                        if (ifMatcher.test(secondParse.contents)) {
+                            let def: JSSDefinition = {
+                                name: compare,
+                                type: 'if',
+                                contents: secondParse.contents.match(ifMatcher)!.toString() || '',
+                            };
+                            defs.push(def);
+                        }
+                    }
+                    break;
                 default:
                     line = '/* invalid action replaced here */';
                     break;
@@ -172,6 +219,14 @@ const parseECSS = async (data: string): Promise<JSSData> => {
     for (const d of defs) {
         if (d.type === 'struct') {
             thirdParse.contents = thirdParse.contents.replace(d.contents, '');
+        }
+        if (d.type === 'if') {
+            if (eval(d.name)) {
+                const replacer = d.contents.split('\n')[0];
+                thirdParse.contents = thirdParse.contents.replace(replacer, '').replace('}', '');
+            } else {
+                thirdParse.contents = thirdParse.contents.replace(d.contents, '');
+            }
         }
     }
 
@@ -197,6 +252,66 @@ const parseECSS = async (data: string): Promise<JSSData> => {
     return response;
 };
 
+const recurFindExtenders = (line: string): string => {
+    let newLine: string = '';
+    let type: string = line.split('<')[1].split('>')[0].trim();; 
+    let extendFrom: string = line.split('>')[1].split(':')[1].split(';')[0].trim(); 
+    for (const d of defs) {
+        if (d.type == type && d.name == extendFrom && d.type !== 'struct' && d.type !== 'if') {
+            let defContents = d.contents.replace(`${getCSSOperator(d.type)}${d.name} {`, '').replace('}', '').trim();
+            newLine = line.replace(`@impl<${d.type}>: ${d.name};`, defContents).trim();
+        } else if (d.type == 'struct') {
+            const newExt = extendFrom.split('(')[0].trim();
+            if (d.name == newExt) {
+                try {
+                    const args = extendFrom.split('(')[1].split(')')[0];
+                    const name = extendFrom.replace(`(${args})`, '');
+                    if (args.length > 0) {
+                        const argIter = args.split(',');
+                        for (let i = 0; i < argIter.length; i++) {
+                            for (const v of vars) {
+                                if (v.position == i && v.owner == name && !v.public) {
+                                    // console.log(d.contents);
+                                    if (argIter[i].trim() !== '_') {
+                                        v.value = argIter[i];
+                                    }
+                                    if (argIter[i].trim().startsWith('$')) {
+                                        const varReplacer = argIter[i].trim().split('$')[1].trim();
+                                        v.value = getVar(varReplacer, 'JSS');
+                                    }
+                                }
+                            }
+                        }
+                        newLine = line.replace(`@impl<${d.type}>: ${d.name}(${args});`, d.contents.replace('}', '')).trim();
+                    }
+                } catch (e) {
+                    for (const v of vars) {
+                        if (!v.public) {
+                            v.value = v.origValue;
+                        }
+                    }
+                    let defContents = d.contents.replace(`${getCSSOperator(d.type)}${d.name} {`, '').replace('}', '').trim();
+                    newLine = line.replace(`@impl<${d.type}>: ${d.name};`, defContents).trim();
+                }
+            }
+        }
+    }
+    
+    if (!newLine.includes('@impl')) {
+        return newLine;
+    }
+    return recurFindExtenders(newLine);
+};
+
+const getVar = (name: string, owner: string): string => {
+    for (const v of vars) {
+        if (v.name === name && v.owner === owner) {
+            return v.value;
+        }
+    }
+    return '';
+};
+
 const getCSSOperator = (type: string) => {
     let operator = '';
     switch (type) {
@@ -213,47 +328,6 @@ const getCSSOperator = (type: string) => {
             break;
     }
     return operator;
-};
-
-const recurFindExtenders = (line: string): string => {
-    let newLine: string = '';
-    const type: string = line.split('<')[1].split('>')[0].trim();
-    const extendFrom: string = line.split('>')[1].split(':')[1].split(';')[0].trim();
-    for (const d of defs) {
-        if (d.type == type && d.name == extendFrom && d.type !== 'struct') {
-            let defContents = d.contents.replace(`${getCSSOperator(d.type)}${d.name} {`, '').replace('}', '').trim();
-            newLine = line.replace(`@impl<${d.type}>: ${d.name};`, defContents).trim();
-        } else if (d.name == extendFrom && d.type != type) {
-            newLine = `/* did you mean to use type "${getCSSOperator(d.type)}" for @impl selector "${d.name}"? */`;
-        } else if (d.type == 'struct') {
-            const newExt = extendFrom.split('(')[0].trim();
-            if (d.name == newExt) {
-                try {
-                    const args = extendFrom.split('(')[1].split(')')[0];
-                    const name = extendFrom.replace(`(${args})`, '');
-                    if (args.length > 0) {
-                        // DEBUGGING: console.log(`${name} : ${args}`);
-                        const argIter = args.split(',');
-                        for (let i = 0; i < argIter.length; i++) {
-                            for (const v of vars) {
-                                if (v.position == i && v.owner == name && !v.public) {
-                                    v.value = argIter[i];
-                                }
-                            }
-                        }
-                        newLine = line.replace(`@impl<${d.type}>: ${d.name}(${args});`, d.contents.replace('}', '')).trim();
-                    }
-                } catch (e) {
-                    let defContents = d.contents.replace(`${getCSSOperator(d.type)}${d.name} {`, '').replace('}', '').trim();
-                    newLine = line.replace(`@impl<${d.type}>: ${d.name};`, defContents).trim();
-                }
-            }
-        }
-    }
-    if (!newLine.includes('@impl')) {
-        return newLine;
-    }
-    return recurFindExtenders(newLine);
 };
 
 const writeOutput = async (data: JSSData): Promise<void> => {
